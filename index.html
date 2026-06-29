@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Key Management — Arbetsfördelning</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'EB Garamond', Georgia, serif; background: #F8F6F2; color: #3E4756; min-height: 100vh; }
+
+  /* AUTH */
+  .auth-wrapper { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .auth-box { background: white; border-radius: 6px; padding: 40px; width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,0.10); }
+  .auth-logo { font-size: 13px; font-weight: 600; color: #3E4756; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px; }
+  .auth-title { font-size: 22px; font-weight: 600; color: #3E4756; margin-bottom: 24px; }
+  .auth-label { font-size: 13px; color: #A8B5A2; margin-bottom: 6px; display: block; }
+  .auth-input { font-family: inherit; font-size: 14px; border: 1px solid #D9C8B6; background: #F8F6F2; color: #3E4756; padding: 9px 12px; border-radius: 3px; width: 100%; margin-bottom: 14px; }
+  .auth-input:focus { outline: none; border-color: #DE6032; background: white; }
+  .auth-btn { font-family: inherit; font-size: 14px; padding: 10px 0; border: none; background: #DE6032; color: white; border-radius: 3px; width: 100%; cursor: pointer; margin-bottom: 10px; }
+  .auth-btn:hover { background: #c45328; }
+  .auth-btn.secondary { background: transparent; border: 1px solid #D9C8B6; color: #3E4756; }
+  .auth-btn.secondary:hover { background: #F8F6F2; }
+  .auth-error { font-size: 13px; color: #c0392b; margin-bottom: 12px; display: none; }
+  .auth-success { font-size: 13px; color: #27ae60; margin-bottom: 12px; display: none; }
+  .auth-divider { text-align: center; font-size: 12px; color: #A8B5A2; margin: 10px 0; }
+
+  /* APP */
+  .app-wrapper { display: none; }
+  .km-header { background: #3E4756; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; gap: 12px; }
+  .km-logo { font-size: 15px; font-weight: 600; color: #F8F6F2; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
+  .km-title { font-size: 14px; color: #A8B5A2; letter-spacing: 0.05em; white-space: nowrap; }
+  .km-header-right { display: flex; align-items: center; gap: 8px; }
+  .km-year-select { background: #3E4756; border: 1px solid #A8B5A2; color: #F8F6F2; font-family: inherit; font-size: 13px; padding: 4px 10px; border-radius: 3px; cursor: pointer; }
+  .km-year-select option { background: #3E4756; color: #F8F6F2; }
+  .km-header-btn { font-family: inherit; font-size: 12px; padding: 4px 10px; border: 1px solid #A8B5A2; background: transparent; color: #A8B5A2; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+  .km-header-btn:hover { border-color: #F8F6F2; color: #F8F6F2; }
+  .km-header-btn.accent { border-color: #DE6032; color: #DE6032; }
+  .km-header-btn.accent:hover { background: #DE6032; color: white; }
+  .km-tabs { background: #3E4756; display: flex; overflow-x: auto; padding: 0 24px; scrollbar-width: none; position: sticky; top: 49px; z-index: 9; border-top: 1px solid #4a5668; }
+  .km-tabs::-webkit-scrollbar { display: none; }
+  .km-tab { padding: 9px 16px; font-size: 13px; font-family: inherit; color: #A8B5A2; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; transition: color 0.15s; }
+  .km-tab:hover { color: #F8F6F2; }
+  .km-tab.active { color: #F8F6F2; border-bottom: 2px solid #DE6032; }
+  .km-tab.overview-tab { color: #DE6032; font-weight: 600; }
+  .km-tab.overview-tab.active { border-bottom: 2px solid #DE6032; }
+  .km-tab.add-person-tab { color: #DE6032; opacity: 0.75; }
+  .km-tab.add-person-tab:hover { opacity: 1; }
+  .km-content { padding: 20px 24px; }
+  .save-indicator { font-size: 12px; color: #A8B5A2; }
+  .save-indicator.saving { color: #DE6032; }
+  .save-indicator.saved { color: #27ae60; }
+
+  .ov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; margin-bottom: 20px; }
+  .ov-card { background: white; border: 1px solid #E8E4DE; border-radius: 4px; padding: 8px 10px; cursor: pointer; transition: border-color 0.15s; min-width: 0; overflow: hidden; }
+  .ov-card:hover { border-color: #DE6032; }
+  .ov-card-name { font-size: 11px; color: #A8B5A2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+  .ov-card-pct { font-size: 15px; font-weight: 600; color: #3E4756; margin-bottom: 5px; }
+  .ov-card-pct.over { color: #DE6032; }
+  .ov-months-mini { display: flex; gap: 1px; }
+  .ov-month-dot { flex: 1; height: 3px; border-radius: 1px; background: #E8E4DE; overflow: hidden; }
+  .ov-month-fill { height: 100%; border-radius: 1px; }
+  .ov-section-title { font-size: 12px; font-weight: 600; color: #A8B5A2; margin-bottom: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .km-person-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+  .km-person-total { font-size: 14px; color: #3E4756; background: #D9C8B6; padding: 5px 14px; border-radius: 3px; white-space: nowrap; }
+  .km-person-total span { font-weight: 600; color: #DE6032; }
+  .km-add-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+  .km-add-row input[type="text"] { font-family: inherit; font-size: 14px; border: 1px solid #D9C8B6; background: white; color: #3E4756; padding: 7px 12px; border-radius: 3px; width: 220px; }
+  .km-add-row input[type="text"]:focus { outline: none; border-color: #DE6032; }
+  .km-btn { font-family: inherit; font-size: 13px; padding: 7px 14px; border: 1px solid #DE6032; background: #DE6032; color: white; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+  .km-btn:hover { background: #c45328; border-color: #c45328; }
+  .km-btn-ghost { background: transparent; color: #3E4756; border-color: #D9C8B6; }
+  .km-btn-ghost:hover { background: #D9C8B6; }
+  .km-btn-danger { background: transparent; border-color: #c0392b; color: #c0392b; }
+  .km-btn-danger:hover { background: #c0392b; color: white; }
+  .km-table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 860px; }
+  th { background: #3E4756; color: #F8F6F2; padding: 8px 6px; text-align: center; font-weight: 500; font-size: 14px; white-space: nowrap; }
+  th.project-col { text-align: left; padding-left: 12px; min-width: 160px; }
+  td { border: 1px solid #E8E4DE; padding: 0; text-align: center; background: white; }
+  td.project-name-cell { text-align: left; padding: 0; background: #F8F6F2; border-right: 2px solid #D9C8B6; }
+  .project-name-input { font-family: inherit; font-size: 13px; color: #3E4756; background: transparent; border: none; padding: 8px 12px; width: 100%; }
+  .project-name-input:focus { outline: 1px solid #DE6032; }
+  .pct-input { font-family: inherit; font-size: 13px; color: #3E4756; background: transparent; border: none; padding: 7px 4px; text-align: center; width: 100%; min-width: 40px; }
+  .pct-input:focus { outline: 1px solid #DE6032; background: #fff8f5; }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { opacity: 0.4; }
+  td.total-col { background: #F8F6F2; font-weight: 600; color: #3E4756; padding: 7px 10px; border-left: 2px solid #D9C8B6; border-right: 2px solid #D9C8B6; white-space: nowrap; }
+  td.del-col { background: #F8F6F2; border: none; padding: 4px; width: 30px; opacity: 0.4; }
+  td.del-col:hover { opacity: 1; }
+  .del-btn { background: none; border: none; color: #A8B5A2; cursor: pointer; font-size: 16px; padding: 2px 5px; border-radius: 2px; }
+  .del-btn:hover { color: #DE6032; background: #fde8e2; }
+  tr.total-row td { background: #3E4756; color: #F8F6F2; font-weight: 600; padding: 8px 6px; border: none; font-size: 14px; }
+  tr.total-row td.over { color: #DE6032; }
+  tr.total-row td.project-name-cell { background: #3E4756; color: #A8B5A2; font-size: 14px; padding-left: 12px; border-right: 2px solid #4a5668; }
+  td.cell-filled { background: #fff3ef; }
+  td.cell-over { background: #fde8e2; }
+  .km-name-edit { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+  .km-name-edit label { font-size: 12px; color: #A8B5A2; }
+  .km-name-field { font-family: inherit; font-size: 19px; font-weight: 600; border: none; border-bottom: 1px solid #D9C8B6; background: transparent; color: #3E4756; padding: 2px 4px; width: 260px; }
+  .km-name-field:focus { outline: none; border-bottom-color: #DE6032; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(62,71,86,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .modal { background: #F8F6F2; border-radius: 6px; padding: 24px; width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+  .modal h3 { font-size: 16px; font-weight: 600; color: #3E4756; margin-bottom: 14px; }
+  .modal input { font-family: inherit; font-size: 14px; border: 1px solid #D9C8B6; background: white; color: #3E4756; padding: 8px 12px; border-radius: 3px; width: 100%; margin-bottom: 14px; }
+  .modal input:focus { outline: none; border-color: #DE6032; }
+  .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .modal-cancel { font-family: inherit; font-size: 12px; padding: 7px 14px; border: 1px solid #D9C8B6; background: transparent; color: #3E4756; border-radius: 3px; cursor: pointer; }
+  .modal-cancel:hover { background: #D9C8B6; }
+  .loading { text-align: center; padding: 60px; color: #A8B5A2; font-size: 16px; }
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div class="auth-wrapper" id="authWrapper">
+  <div class="auth-box">
+    <div class="auth-logo">Key Management</div>
+    <div class="auth-title" id="authTitle">Logga in</div>
+    <div class="auth-error" id="authError"></div>
+    <div class="auth-success" id="authSuccess"></div>
+    <div id="loginForm">
+      <label class="auth-label">E-postadress</label>
+      <input class="auth-input" type="email" id="loginEmail" placeholder="namn@keymanagement.se" />
+      <label class="auth-label">Lösenord</label>
+      <input class="auth-input" type="password" id="loginPassword" placeholder="••••••••" />
+      <button class="auth-btn" id="loginBtn">Logga in</button>
+      <div class="auth-divider">—</div>
+      <button class="auth-btn secondary" id="forgotBtn">Glömt lösenord?</button>
+    </div>
+    <div id="resetForm" style="display:none">
+      <label class="auth-label">E-postadress</label>
+      <input class="auth-input" type="email" id="resetEmail" placeholder="namn@keymanagement.se" />
+      <button class="auth-btn" id="resetBtn">Skicka återställningslänk</button>
+      <div class="auth-divider">—</div>
+      <button class="auth-btn secondary" id="backToLoginBtn">Tillbaka till inloggning</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-wrapper" id="appWrapper">
+  <div class="km-header">
+    <div class="km-logo">Key Management</div>
+    <div class="km-title">Arbetsfördelning</div>
+    <div class="km-header-right">
+      <span class="save-indicator" id="saveIndicator"></span>
+      <select class="km-year-select" id="yearSel" onchange="updateYear()"></select>
+      <button class="km-header-btn accent" onclick="addYear()">+ År</button>
+      <button class="km-header-btn" onclick="saveData()">&#128190; Spara</button>
+      <button class="km-header-btn" onclick="signOut()">Logga ut</button>
+    </div>
+  </div>
+  <div class="km-tabs" id="tabBar"></div>
+  <div class="km-content" id="mainContent"><div class="loading">Laddar...</div></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://gfsdrknmdzwmgteofpsz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_2eiGfQaqdTUFwAiQMEKvqw_Z6m5qCDa';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const MONTHS = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+const DEFAULT_YEARS = [2026, 2027];
+const DEFAULT_PEOPLE = Array.from({length:10}, (_, i) => ({id: 'p'+(i+1), name: 'Person '+(i+1)}));
+
+let years = [2026, 2027];
+let currentYear = 2026;
+let activeTab = 'overview';
+let nextPersonId = 11;
+let people = DEFAULT_PEOPLE.map(p => ({...p}));
+let allData = {};
+let saveTimeout = null;
+
+// AUTH
+document.getElementById('loginBtn').onclick = async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  showAuthError('');
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) showAuthError('Fel e-postadress eller lösenord.');
+};
+
+document.getElementById('loginPassword').onkeydown = e => {
+  if (e.key === 'Enter') document.getElementById('loginBtn').click();
+};
+
+document.getElementById('forgotBtn').onclick = () => {
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('resetForm').style.display = 'block';
+  document.getElementById('authTitle').textContent = 'Återställ lösenord';
+  showAuthError('');
+};
+
+document.getElementById('backToLoginBtn').onclick = () => {
+  document.getElementById('resetForm').style.display = 'none';
+  document.getElementById('loginForm').style.display = 'block';
+  document.getElementById('authTitle').textContent = 'Logga in';
+  showAuthError('');
+};
+
+document.getElementById('resetBtn').onclick = async () => {
+  const email = document.getElementById('resetEmail').value.trim();
+  if (!email) { showAuthError('Ange din e-postadress.'); return; }
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  if (error) showAuthError('Något gick fel. Kontrollera e-postadressen.');
+  else showAuthSuccess('Återställningslänk skickad! Kolla din e-post.');
+};
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function showAuthSuccess(msg) {
+  const el = document.getElementById('authSuccess');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function signOut() {
+  await supabase.auth.signOut();
+  document.getElementById('appWrapper').style.display = 'none';
+  document.getElementById('authWrapper').style.display = 'flex';
+}
+
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (session) {
+    document.getElementById('authWrapper').style.display = 'none';
+    document.getElementById('appWrapper').style.display = 'block';
+    await loadData();
+    render();
+  } else {
+    document.getElementById('appWrapper').style.display = 'none';
+    document.getElementById('authWrapper').style.display = 'flex';
+  }
+});
+
+// DATA
+async function loadData() {
+  const { data, error } = await supabase
+    .from('arbetsfordelning')
+    .select('data')
+    .eq('id', 1)
+    .single();
+
+  if (data && data.data) {
+    const s = data.data;
+    if (s.years && s.years.length) years = s.years;
+    if (s.people && s.people.length) people = s.people;
+    if (s.allData) allData = s.allData;
+    if (s.nextPersonId) nextPersonId = s.nextPersonId;
+    if (s.currentYear) currentYear = s.currentYear;
+  }
+
+  if (!Array.isArray(years) || years.length === 0) years = [2026, 2027];
+  if (!Array.isArray(people) || people.length === 0) people = DEFAULT_PEOPLE.map(p => ({...p}));
+  if (!years.includes(currentYear)) currentYear = years[0];
+  years.forEach(y => ensureYear(y));
+}
+
+async function saveData() {
+  setIndicator('saving');
+  const state = {years, people, allData, nextPersonId, currentYear};
+
+  const { data: existing } = await supabase
+    .from('arbetsfordelning')
+    .select('id')
+    .eq('id', 1)
+    .single();
+
+  let error;
+  if (existing) {
+    ({ error } = await supabase
+      .from('arbetsfordelning')
+      .update({ data: state })
+      .eq('id', 1));
+  } else {
+    ({ error } = await supabase
+      .from('arbetsfordelning')
+      .insert({ id: 1, data: state }));
+  }
+
+  if (error) setIndicator('error');
+  else setIndicator('saved');
+}
+
+function scheduleSave() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  setIndicator('saving');
+  saveTimeout = setTimeout(saveData, 1500);
+}
+
+function setIndicator(state) {
+  const el = document.getElementById('saveIndicator');
+  el.className = 'save-indicator';
+  if (state === 'saving') { el.textContent = 'Sparar...'; el.classList.add('saving'); }
+  else if (state === 'saved') { el.textContent = '✓ Sparat'; el.classList.add('saved'); setTimeout(() => el.textContent = '', 3000); }
+  else if (state === 'error') { el.textContent = 'Fel vid sparning'; el.style.color = '#c0392b'; }
+}
+
+// APP LOGIC
+function yk(y) { return String(y !== undefined ? y : currentYear); }
+
+function ensureYear(year) {
+  const y = yk(year);
+  if (!allData[y]) allData[y] = {};
+  people.forEach(p => {
+    if (!allData[y][p.id]) allData[y][p.id] = [{name: '', values: Array(12).fill('')}];
+  });
+}
+
+function getData(year) {
+  const y = year !== undefined ? year : currentYear;
+  ensureYear(y);
+  return allData[yk(y)];
+}
+
+function populateYearSelect() {
+  const sel = document.getElementById('yearSel');
+  if (!sel) return;
+  sel.innerHTML = years.map(y => `<option value="${y}"${y === currentYear ? ' selected' : ''}>${y}</option>`).join('');
+}
+
+function updateYear() {
+  const sel = document.getElementById('yearSel');
+  if (!sel) return;
+  currentYear = parseInt(sel.value);
+  ensureYear(currentYear);
+  render();
+}
+
+function addYear() {
+  const ny = Math.max(...years) + 1;
+  years.push(ny);
+  currentYear = ny;
+  ensureYear(ny);
+  scheduleSave();
+  render();
+}
+
+function openAddPerson() {
+  showModal('Lägg till person', '', name => {
+    const id = 'p' + nextPersonId++;
+    people.push({id, name: name || ('Person ' + (nextPersonId - 1))});
+    sortPeople();
+    years.forEach(y => ensureYear(y));
+    scheduleSave();
+    activeTab = id;
+    render();
+  });
+}
+
+function confirmDeletePerson(pid) {
+  const person = people.find(p => p.id === pid);
+  if (!person) return;
+  if (!confirm('Ta bort ' + person.name + '? All data raderas.')) return;
+  people = people.filter(p => p.id !== pid);
+  years.forEach(y => { if (allData[yk(y)]) delete allData[yk(y)][pid]; });
+  activeTab = 'overview';
+  scheduleSave();
+  render();
+}
+
+function render() {
+  years.forEach(y => ensureYear(y));
+  populateYearSelect();
+  renderTabs();
+  if (activeTab === 'overview') renderOverview();
+  else renderPerson(activeTab);
+}
+
+function renderTabs() {
+  const bar = document.getElementById('tabBar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  const ov = document.createElement('button');
+  ov.className = 'km-tab overview-tab' + (activeTab === 'overview' ? ' active' : '');
+  ov.textContent = 'Översikt';
+  ov.onclick = () => { activeTab = 'overview'; render(); };
+  bar.appendChild(ov);
+  people.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'km-tab' + (activeTab === p.id ? ' active' : '');
+    btn.textContent = p.name;
+    btn.onclick = () => { activeTab = p.id; render(); };
+    bar.appendChild(btn);
+  });
+  const add = document.createElement('button');
+  add.className = 'km-tab add-person-tab';
+  add.textContent = '+ Person';
+  add.onclick = openAddPerson;
+  bar.appendChild(add);
+}
+
+function getTotal(pid, m, year) {
+  const d = getData(year);
+  return (d[pid] || []).reduce((s, r) => s + (parseFloat(r.values[m]) || 0), 0);
+}
+
+function getAvg(pid, year) {
+  let s = 0;
+  for (let m = 0; m < 12; m++) s += getTotal(pid, m, year);
+  return Math.round(s / 12);
+}
+
+function renderOverview() {
+  const mc = document.getElementById('mainContent');
+  if (!mc) return;
+
+  const grid = document.createElement('div');
+  grid.className = 'ov-grid';
+  people.forEach(p => {
+    const avg = getAvg(p.id);
+    const card = document.createElement('div');
+    card.className = 'ov-card';
+    card.title = p.name;
+    card.onclick = () => { activeTab = p.id; render(); };
+    const months = Array.from({length: 12}, (_, m) => getTotal(p.id, m));
+    const dots = months.map(v => {
+      const pct = Math.min(v / 100, 1);
+      const bg = v > 100 ? '#DE6032' : v > 0 ? '#A8B5A2' : '#E8E4DE';
+      return `<div class="ov-month-dot"><div class="ov-month-fill" style="width:${Math.round(pct*100)}%;background:${bg}"></div></div>`;
+    }).join('');
+    card.innerHTML = `<div class="ov-card-name">${esc(p.name)}</div><div class="ov-card-pct${avg > 100 ? ' over' : ''}">${avg}%</div><div class="ov-months-mini">${dots}</div>`;
+    grid.appendChild(card);
+  });
+
+  const tots = Array.from({length: 12}, (_, m) => people.reduce((s, p) => s + getTotal(p.id, m), 0) / Math.max(people.length, 1));
+  const gavg = Math.round(tots.reduce((s, v) => s + v, 0) / 12);
+
+  let tbl = `<div class="ov-section-title">Beläggning per person och månad — ${currentYear}</div><div class="km-table-wrap"><table><thead><tr><th class="project-col">Person</th>${MONTHS.map(m => `<th>${m}</th>`).join('')}<th style="background:#3E4756;padding:8px 10px">Snitt</th></tr></thead><tbody>`;
+  people.forEach(p => {
+    const months = Array.from({length: 12}, (_, m) => getTotal(p.id, m));
+    const avg = getAvg(p.id);
+    tbl += `<tr><td class="project-name-cell" style="padding:8px 12px;font-size:13px;cursor:pointer" data-pid="${p.id}">${esc(p.name)}</td>`;
+    months.forEach(v => {
+      const cls = v > 100 ? 'cell-over' : v > 0 ? 'cell-filled' : '';
+      const col = v > 100 ? '#DE6032' : v > 0 ? '#3E4756' : '#C0BBBA';
+      tbl += `<td class="${cls}" style="padding:7px 4px;font-size:13px;color:${col}">${v > 0 ? Math.round(v) + '%' : ''}</td>`;
+    });
+    tbl += `<td class="total-col">${avg}%</td></tr>`;
+  });
+  tbl += `<tr class="total-row"><td class="project-name-cell">Teamsnitt</td>${tots.map(v => `<td>${Math.round(v)}%</td>`).join('')}<td>${gavg}%</td></tr></tbody></table></div>`;
+
+  const section = document.createElement('div');
+  section.innerHTML = tbl;
+  section.querySelectorAll('[data-pid]').forEach(el => {
+    el.onclick = () => { activeTab = el.getAttribute('data-pid'); render(); };
+  });
+
+  mc.innerHTML = '';
+  mc.appendChild(grid);
+  mc.appendChild(section);
+}
+
+function renderPerson(pid) {
+  const person = people.find(p => p.id === pid);
+  if (!person) { activeTab = 'overview'; renderOverview(); return; }
+  const mc = document.getElementById('mainContent');
+  if (!mc) return;
+  const d = getData();
+  if (!d[pid]) d[pid] = [{name: '', values: Array(12).fill('')}];
+  const rows = d[pid];
+  const mTots = Array.from({length: 12}, (_, m) => getTotal(pid, m));
+  const avg = Math.round(mTots.reduce((s, v) => s + v, 0) / 12);
+  const prevYear = currentYear - 1;
+  const hasPrev = years.includes(prevYear);
+  const prevProjs = hasPrev ? (allData[yk(prevYear)]?.[pid] || []).filter(r => r.name.trim() !== '') : [];
+
+  mc.innerHTML = '';
+
+  const header = document.createElement('div');
+  header.className = 'km-person-header';
+  header.innerHTML = `<div><div class="km-name-edit"><label>Namn:</label><input class="km-name-field" value="${esc(person.name)}" id="nameField_${pid}" /></div></div><div style="display:flex;gap:8px;align-items:center"><div class="km-person-total">Årssnitt ${currentYear}: <span id="avgSpan">${avg}%</span></div><button class="km-btn km-btn-danger" id="deletePersonBtn">Ta bort person</button></div>`;
+  header.querySelector('#nameField_' + pid).onchange = e => renamePerson(pid, e.target.value);
+  header.querySelector('#deletePersonBtn').onclick = () => confirmDeletePerson(pid);
+  mc.appendChild(header);
+
+  const addRow = document.createElement('div');
+  addRow.className = 'km-add-row';
+  addRow.innerHTML = `<input type="text" id="newProjInput" placeholder="Projektnamn..." /><button class="km-btn" id="addProjBtn">+ Lägg till projekt</button>${hasPrev && prevProjs.length > 0 ? `<button class="km-btn km-btn-ghost" id="copyPrevBtn">&#8617; Kopiera projekt från ${prevYear}</button>` : ''}`;
+  addRow.querySelector('#addProjBtn').onclick = () => addProject(pid);
+  addRow.querySelector('#newProjInput').onkeydown = e => { if (e.key === 'Enter') addProject(pid); };
+  if (hasPrev && prevProjs.length > 0) addRow.querySelector('#copyPrevBtn').onclick = () => copyFromPrev(pid);
+  mc.appendChild(addRow);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'km-table-wrap';
+  let tbl = `<table><thead><tr><th class="project-col">Projekt</th>${MONTHS.map(m => `<th>${m}</th>`).join('')}<th style="background:#3E4756;padding:8px 10px;border-left:2px solid #D9C8B6;border-right:2px solid #D9C8B6;">Snitt/mån</th><th style="background:#3E4756;width:30px;text-align:center;opacity:0.5;">&#128465;</th></tr></thead><tbody>`;
+
+  rows.forEach((row, ri) => {
+    const rowSnitt = Math.round(row.values.reduce((s, v) => s + (parseFloat(v) || 0), 0) / 12);
+    tbl += `<tr><td class="project-name-cell"><input class="project-name-input" value="${esc(row.name)}" placeholder="Projektnamn..." data-ri="${ri}" /></td>`;
+    row.values.forEach((v, mi) => {
+      const cls = v !== '' && mTots[mi] > 100 ? 'cell-over' : v !== '' ? 'cell-filled' : '';
+      tbl += `<td class="${cls}"><input class="pct-input" type="number" min="0" step="5" value="${v}" data-ri="${ri}" data-mi="${mi}" /></td>`;
+    });
+    tbl += `<td class="total-col" id="snitt_${ri}">${rowSnitt}%</td><td class="del-col"><button class="del-btn" data-ri="${ri}">&#215;</button></td></tr>`;
+  });
+
+  tbl += `<tr class="total-row"><td class="project-name-cell">Totalt beläggning</td>${mTots.map((t, m) => `<td id="mtot_${m}" class="${t > 100 ? 'over' : ''}">${Math.round(t)}%</td>`).join('')}<td id="grandAvg">${avg}%</td><td></td></tr></tbody></table>`;
+  wrap.innerHTML = tbl;
+
+  wrap.querySelectorAll('.project-name-input').forEach(inp => {
+    inp.onchange = e => updateName(pid, parseInt(e.target.getAttribute('data-ri')), e.target.value);
+  });
+  wrap.querySelectorAll('.pct-input').forEach(inp => {
+    inp.onchange = e => updateVal(pid, parseInt(e.target.getAttribute('data-ri')), parseInt(e.target.getAttribute('data-mi')), e.target.value);
+    inp.onkeydown = e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const inputs = Array.from(wrap.querySelectorAll('.pct-input'));
+        const i = inputs.indexOf(e.target);
+        if (i >= 0 && i < inputs.length - 1) inputs[i + 1].focus();
+      }
+    };
+  });
+  wrap.querySelectorAll('.del-btn').forEach(btn => {
+    btn.onclick = e => deleteRow(pid, parseInt(e.target.getAttribute('data-ri')));
+  });
+  mc.appendChild(wrap);
+}
+
+function sortPeople() { people.sort((a, b) => a.name.localeCompare(b.name, 'sv')); }
+function sortProjects(pid) { const r = getData()[pid]; if (r) r.sort((a, b) => a.name.localeCompare(b.name, 'sv')); }
+
+function renamePerson(pid, name) {
+  const p = people.find(x => x.id === pid);
+  if (p) { p.name = name; sortPeople(); scheduleSave(); renderTabs(); }
+}
+
+function addProject(pid) {
+  const inp = document.getElementById('newProjInput');
+  const name = inp ? inp.value.trim() : '';
+  getData()[pid].push({name, values: Array(12).fill('')});
+  sortProjects(pid);
+  scheduleSave();
+  render();
+}
+
+function deleteRow(pid, ri) {
+  const rows = getData()[pid];
+  if (!rows) return;
+  if (rows.length > 1) rows.splice(ri, 1);
+  else rows[0] = {name: '', values: Array(12).fill('')};
+  scheduleSave();
+  render();
+}
+
+function updateName(pid, ri, val) {
+  const d = getData();
+  if (d[pid] && d[pid][ri]) d[pid][ri].name = val;
+  sortProjects(pid);
+  scheduleSave();
+}
+
+function updateVal(pid, ri, mi, val) {
+  const v = val === '' ? '' : Math.max(0, parseFloat(val) || 0);
+  const d = getData();
+  if (d[pid] && d[pid][ri]) d[pid][ri].values[mi] = v === '' ? '' : v;
+  scheduleSave();
+
+  const rowVals = d[pid][ri].values.map(x => parseFloat(x) || 0);
+  const rowSnitt = Math.round(rowVals.reduce((s, x) => s + x, 0) / 12);
+  const snittEl = document.getElementById('snitt_' + ri);
+  if (snittEl) snittEl.textContent = rowSnitt + '%';
+
+  const mTots = Array.from({length: 12}, (_, m) => getTotal(pid, m));
+  const avg = Math.round(mTots.reduce((s, v) => s + v, 0) / 12);
+  mTots.forEach((t, m) => {
+    const el = document.getElementById('mtot_' + m);
+    if (el) { el.textContent = Math.round(t) + '%'; el.className = t > 100 ? 'over' : ''; }
+  });
+  const avgEl = document.getElementById('grandAvg');
+  if (avgEl) avgEl.textContent = avg + '%';
+  const spanEl = document.getElementById('avgSpan');
+  if (spanEl) spanEl.textContent = avg + '%';
+}
+
+function copyFromPrev(pid) {
+  const prevYear = currentYear - 1;
+  if (!years.includes(prevYear)) return;
+  const prev = (allData[yk(prevYear)]?.[pid] || []).filter(r => r.name.trim() !== '');
+  if (!prev.length) return;
+  const d = getData();
+  const existing = d[pid].map(r => r.name.trim().toLowerCase());
+  let added = 0;
+  prev.forEach(r => {
+    if (!existing.includes(r.name.trim().toLowerCase())) {
+      d[pid].push({name: r.name, values: Array(12).fill('')});
+      added++;
+    }
+  });
+  if (added === 0) { alert('Alla projekt från ' + prevYear + ' finns redan tillagda.'); return; }
+  sortProjects(pid);
+  scheduleSave();
+  render();
+}
+
+function showModal(title, defaultVal, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const h3 = document.createElement('h3');
+  h3.textContent = title;
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = defaultVal;
+  const btns = document.createElement('div');
+  btns.className = 'modal-btns';
+  const cancel = document.createElement('button');
+  cancel.className = 'modal-cancel';
+  cancel.textContent = 'Avbryt';
+  cancel.onclick = () => overlay.remove();
+  const ok = document.createElement('button');
+  ok.className = 'km-btn';
+  ok.textContent = 'Lägg till';
+  const confirm = () => { onConfirm(inp.value.trim()); overlay.remove(); };
+  ok.onclick = confirm;
+  inp.onkeydown = e => { if (e.key === 'Enter') confirm(); if (e.key === 'Escape') overlay.remove(); };
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  btns.appendChild(cancel);
+  btns.appendChild(ok);
+  modal.appendChild(h3);
+  modal.appendChild(inp);
+  modal.appendChild(btns);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  inp.focus();
+}
+
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
