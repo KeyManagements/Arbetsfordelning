@@ -240,7 +240,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 // DATA
 async function loadData() {
   const { data, error } = await supabase
-    .from('arbetsfordelning')
+    .from('Arbetsfordelning')
     .select('data')
     .eq('id', 1)
     .single();
@@ -265,7 +265,7 @@ async function saveData() {
   const state = {years, people, allData, nextPersonId, currentYear};
 
   const { data: existing } = await supabase
-    .from('arbetsfordelning')
+    .from('Arbetsfordelning')
     .select('id')
     .eq('id', 1)
     .single();
@@ -273,12 +273,12 @@ async function saveData() {
   let error;
   if (existing) {
     ({ error } = await supabase
-      .from('arbetsfordelning')
+      .from('Arbetsfordelning')
       .update({ data: state })
       .eq('id', 1));
   } else {
     ({ error } = await supabase
-      .from('arbetsfordelning')
+      .from('Arbetsfordelning')
       .insert({ id: 1, data: state }));
   }
 
