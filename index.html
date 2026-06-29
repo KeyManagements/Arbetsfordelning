@@ -158,7 +158,7 @@
 <script>
 const SUPABASE_URL = 'https://gfsdrknmdzwmgteofpsz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_2eiGfQaqdTUFwAiQMEKvqw_Z6m5qCDa';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const MONTHS = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
 const DEFAULT_YEARS = [2026, 2027];
@@ -177,7 +177,7 @@ document.getElementById('loginBtn').onclick = async () => {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
   showAuthError('');
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) showAuthError('Fel e-postadress eller lösenord.');
 };
 
@@ -202,7 +202,7 @@ document.getElementById('backToLoginBtn').onclick = () => {
 document.getElementById('resetBtn').onclick = async () => {
   const email = document.getElementById('resetEmail').value.trim();
   if (!email) { showAuthError('Ange din e-postadress.'); return; }
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
   if (error) showAuthError('Något gick fel. Kontrollera e-postadressen.');
   else showAuthSuccess('Återställningslänk skickad! Kolla din e-post.');
 };
@@ -220,12 +220,12 @@ function showAuthSuccess(msg) {
 }
 
 async function signOut() {
-  await supabase.auth.signOut();
+  await supabaseClient.auth.signOut();
   document.getElementById('appWrapper').style.display = 'none';
   document.getElementById('authWrapper').style.display = 'flex';
 }
 
-supabase.auth.onAuthStateChange(async (event, session) => {
+supabaseClient.auth.onAuthStateChange(async (event, session) => {
   if (session) {
     document.getElementById('authWrapper').style.display = 'none';
     document.getElementById('appWrapper').style.display = 'block';
